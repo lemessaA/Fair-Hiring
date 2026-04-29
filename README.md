@@ -1,6 +1,16 @@
 # fair-hiring-network
 
-This is a [Next.js](https://nextjs.org) project bootstrapped with [v0](https://v0.app).
+Fair Hiring Network is a full hiring flow in one place: you define the role, upload candidate materials, get ranked scores, then run a structured interview with a **live in-browser camera and microphone** (preview + timed answers). Results roll up into a single hire recommendation.
+
+**Stack:** [Next.js](https://nextjs.org) (via [v0](https://v0.app)), FastAPI, LLM-backed ranking and interview scoring, Postgres for interview sessions.
+
+### Copy for messages / email
+
+Use this when you share the project with someone else (no links required in the paragraph itself):
+
+> **Fair Hiring Network** — Hiring workflow from job description to decision: scoring, AI interview with a real-time browser video + mic session, and a clear hire / no-hire outcome. Built with Next.js, FastAPI, Groq-style LLM calls, and Postgres.
+
+One sentence: *Job description + candidate files → ranked shortlist → live video-style interview in the browser → combined score and hire signal.*
 
 ## Built with v0
 
@@ -33,4 +43,3 @@ To learn more, take a look at the following resources:
 - [v0 Documentation](https://v0.app/docs) - learn about v0 and how to use it.
 
 <a href="https://v0.app/chat/api/kiro/clone/lemessaA/fair-hiring-network" alt="Open in Kiro"><img src="https://pdgvvgmkdvyeydso.public.blob.vercel-storage.com/open%20in%20kiro.svg?sanitize=true" /></a>
-# HIRED

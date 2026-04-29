@@ -92,16 +92,26 @@ def get_session_factory() -> async_sessionmaker[AsyncSession]:
 
 
 async def init_db() -> None:
-    """Verify Postgres connectivity on startup. Tables are managed via migration scripts."""
+    """Verify Postgres connectivity; optionally create interview tables from models (no Alembic in-repo)."""
     engine = get_engine()
+    auto_create = os.environ.get("INTERVIEW_AUTO_CREATE_TABLES", "1").lower() not in (
+        "0",
+        "false",
+        "no",
+    )
     try:
-        from sqlalchemy import text
+        async with engine.begin() as conn:
+            if auto_create:
+                await conn.run_sync(Base.metadata.create_all)
+            from sqlalchemy import text
 
-        async with engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
-        logger.info("Interview database connection verified (PostgreSQL).")
+        if auto_create:
+            logger.info("Interview database ready (PostgreSQL, tables ensured via create_all).")
+        else:
+            logger.info("Interview database connection verified (PostgreSQL).")
     except Exception as exc:
-        logger.error("Interview database connection failed: %s", exc)
+        logger.error("Interview database init failed: %s", exc)
         raise
 
 
