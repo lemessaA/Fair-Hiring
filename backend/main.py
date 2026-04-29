@@ -34,6 +34,59 @@ logger = logging.getLogger("fair-hiring")
 logging.basicConfig(level=logging.INFO)
 
 
+def _origin_from_url(raw: str) -> str | None:
+    """Normalize to ``scheme://host[:port]`` for CORS (no path, no trailing slash)."""
+    from urllib.parse import urlparse
+
+    u = raw.strip().rstrip("/")
+    if not u:
+        return None
+    if "://" not in u:
+        u = "https://" + u
+    p = urlparse(u)
+    if not p.netloc:
+        return None
+    scheme = (p.scheme or "https").lower()
+    return f"{scheme}://{p.netloc}"
+
+
+def _cors_settings() -> dict[str, Any]:
+    """
+    Origins for browser → API requests (e.g. direct fetch to FastAPI, or tooling).
+    Next.js rewrites are server-to-server and do not use CORS, but explicit origins
+    avoid surprises if the client ever calls the API host directly.
+    """
+    origins: list[str] = []
+    seen: set[str] = set()
+
+    def add(o: str | None) -> None:
+        if not o or o in seen:
+            return
+        seen.add(o)
+        origins.append(o)
+
+    for part in (os.environ.get("CORS_ALLOW_ORIGINS") or "").split(","):
+        add(_origin_from_url(part))
+
+    for key in ("FRONTEND_URL", "SITE_URL", "NEXT_PUBLIC_SITE_URL"):
+        add(_origin_from_url(os.environ.get(key) or ""))
+
+    regex = (os.environ.get("CORS_ALLOW_ORIGIN_REGEX") or "").strip() or None
+
+    if not origins and not regex:
+        return {
+            "allow_origins": ["*"],
+            "allow_origin_regex": None,
+            "allow_credentials": False,
+        }
+
+    return {
+        "allow_origins": origins,
+        "allow_origin_regex": regex,
+        "allow_credentials": False,
+    }
+
+
 @asynccontextmanager
 async def lifespan(app: fastapi.FastAPI):
     await init_db()
@@ -42,19 +95,21 @@ async def lifespan(app: fastapi.FastAPI):
     await dispose_db()
 
 
+_cors = _cors_settings()
+logger.info(
+    "CORS allow_origins=%s allow_origin_regex=%s",
+    _cors["allow_origins"],
+    _cors.get("allow_origin_regex"),
+)
 app = fastapi.FastAPI(title="Fair Hiring Network API", lifespan=lifespan)
 
 app.include_router(interview_router)
 
-# Browser CORS only matters for direct calls to this API (not for Vercel rewrites,
-# which are server-to-server). Comma-separated origins; unset => "*". Do not use
-# allow_credentials=True with wildcard origins (invalid in browsers).
-_cors_raw = (os.environ.get("CORS_ALLOW_ORIGINS") or "").strip()
-_cors_origins = [o.strip() for o in _cors_raw.split(",") if o.strip()] if _cors_raw else ["*"]
 app.add_middleware(
     fastapi.middleware.cors.CORSMiddleware,
-    allow_origins=_cors_origins,
-    allow_credentials=False,
+    allow_origins=_cors["allow_origins"],
+    allow_origin_regex=_cors.get("allow_origin_regex"),
+    allow_credentials=_cors["allow_credentials"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
