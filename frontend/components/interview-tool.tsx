@@ -518,7 +518,7 @@ export function InterviewTool() {
                   <p className="text-xs text-muted-foreground">
                     {loading
                       ? "Submitting answer and loading the next question…"
-                      : "Live tab: wait for the 30s clip to finish — submission runs automatically."}
+                      : `Live tab: wait for the ${LIVE_RECORD_SECONDS}s clip to finish — submission runs automatically.`}
                   </p>
                 )}
               </div>
