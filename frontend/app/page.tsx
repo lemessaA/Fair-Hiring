@@ -19,6 +19,12 @@ export default function HomePage() {
             </div>
           </Link>
           <nav aria-label="Primary" className="hidden items-center gap-1 text-sm md:flex">
+            <Link
+              href="/interview"
+              className="rounded-md px-3 py-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              Interview
+            </Link>
             <a
               href="#how-it-works"
               className="rounded-md px-3 py-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
@@ -188,7 +194,7 @@ export default function HomePage() {
               Built with Next.js, FastAPI, LangGraph and Groq. For demonstration only &mdash; pair with a human reviewer.
             </p>
           </div>
-          <p>&copy; {new Date().getFullYear()} Fair Hiring Network</p>
+          <p suppressHydrationWarning>&copy; {new Date().getFullYear()} Fair Hiring Network</p>
         </div>
       </footer>
     </main>

@@ -8,7 +8,12 @@ __v0_jsx-dev-runtime.ts
 next.user-config.*
 
 # Environment variables
+.env
 .env*.local
+backend/.env
+
+# Local SQLite (video interview MVP)
+backend/interview.db
 
 # Common ignores
 node_modules

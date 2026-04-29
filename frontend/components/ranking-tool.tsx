@@ -1,10 +1,12 @@
 "use client"
 
 import { useCallback, useRef, useState } from "react"
-import { AlertCircle, Briefcase, FileText, Sparkles } from "lucide-react"
+import Link from "next/link"
+import { AlertCircle, Briefcase, FileText, Sparkles, Video } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
+import { ApiBackendBanner } from "@/components/api-backend-banner"
 import { CandidateResults } from "@/components/candidate-results"
 import { FileUpload } from "@/components/file-upload"
 import { JdInput } from "@/components/jd-input"
@@ -107,6 +109,7 @@ export function RankingTool() {
 
   return (
     <div className="space-y-6">
+      <ApiBackendBanner />
       <div className="grid gap-4 md:grid-cols-2 md:gap-5">
         {/* Step 1 — Job description */}
         <StepCard
@@ -189,6 +192,42 @@ export function RankingTool() {
       )}
 
       <div ref={resultsRef}>{result && <CandidateResults result={result} />}</div>
+
+      {result && (
+        <div className="mt-10 flex flex-col items-center gap-3 rounded-xl border border-primary/25 bg-primary/[0.06] p-6 text-center md:p-8">
+          <p className="text-sm font-semibold tracking-tight text-foreground">Next: video interview</p>
+          <p className="max-w-lg text-xs leading-relaxed text-muted-foreground md:text-sm">
+            Continue to a guided session with <strong>20 AI-generated questions</strong> tailored to this role. Your
+            answers are evaluated; at the end you receive an <strong>approve / reject</strong> hiring recommendation
+            from combined resume and interview scores.
+          </p>
+          <Button asChild size="lg" className="gap-2 shadow-sm">
+            <Link
+              href="/interview"
+              onClick={() => {
+                const ranked = [...result.candidates]
+                  .filter((c) => !c.error)
+                  .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+                const top = ranked[0]
+                const skillSet = Array.from(
+                  new Set([...(top?.matched_skills ?? []), ...(top?.skills ?? [])]),
+                )
+                sessionStorage.setItem(
+                  "fh_interview_prefill",
+                  JSON.stringify({
+                    jobDescription: result.job_description,
+                    skills: skillSet.length > 0 ? skillSet : undefined,
+                    resumeScore: typeof top?.score === "number" ? top.score : undefined,
+                  }),
+                )
+              }}
+            >
+              <Video className="h-4 w-4" aria-hidden="true" />
+              Continue to video interview
+            </Link>
+          </Button>
+        </div>
+      )}
     </div>
   )
 }

@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --hostname 0.0.0.0",
+    "dev:full": "npx --yes concurrently -k -n frontend,backend -c green,cyan \"next dev --hostname 0.0.0.0 --port 3000\" \"cd ../backend && uv run uvicorn main:app --host 127.0.0.1 --port 8000 --reload\"",
     "build": "next build",
     "start": "next start",
     "lint": "eslint ."

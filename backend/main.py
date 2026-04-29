@@ -10,6 +10,7 @@ from __future__ import annotations
 import io
 import logging
 import os
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +24,9 @@ from pypdf import PdfReader
 load_dotenv(Path(__file__).resolve().parent / ".env")
 
 from graph import ranking_graph
+from interview.routes import router as interview_router
+from interview.db import dispose_db, init_db
+from interview.redis_client import shutdown_cache
 from pii import mask_pii
 
 
@@ -30,7 +34,17 @@ logger = logging.getLogger("fair-hiring")
 logging.basicConfig(level=logging.INFO)
 
 
-app = fastapi.FastAPI(title="Fair Hiring Network API")
+@asynccontextmanager
+async def lifespan(app: fastapi.FastAPI):
+    await init_db()
+    yield
+    await shutdown_cache()
+    await dispose_db()
+
+
+app = fastapi.FastAPI(title="Fair Hiring Network API", lifespan=lifespan)
+
+app.include_router(interview_router)
 
 app.add_middleware(
     fastapi.middleware.cors.CORSMiddleware,
@@ -43,10 +57,34 @@ app.add_middleware(
 
 @app.get("/health")
 async def health() -> dict[str, Any]:
+    interview_db_ok = False
+    redis_ok = False
+    try:
+        from sqlalchemy import text
+
+        from interview.db import get_engine
+
+        eng = get_engine()
+        async with eng.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+        interview_db_ok = True
+    except Exception:
+        interview_db_ok = False
+    try:
+        from interview.redis_client import get_cache
+
+        c = get_cache()
+        await c.set("__health__", "1", ttl_seconds=5)
+        redis_ok = await c.get("__health__") == "1"
+        await c.delete("__health__")
+    except Exception:
+        redis_ok = False
     return {
         "status": "ok",
         "model": os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile"),
         "groq_key_configured": bool(os.environ.get("GROQ_API_KEY")),
+        "interview_db_ok": interview_db_ok,
+        "redis_ok": redis_ok,
     }
 
 
@@ -102,7 +140,7 @@ async def rank_resumes(
     Each resume is:
       1. Parsed (PDF -> text)
       2. PII-masked locally with regex (email, phone, address, gendered terms)
-      3. Sent to a LangGraph workflow that calls Gemini to analyze + score it
+      3. Sent to a LangGraph workflow that calls Groq to analyze + score it
     """
     if not os.environ.get("GROQ_API_KEY"):
         raise fastapi.HTTPException(

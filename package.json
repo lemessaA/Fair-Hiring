@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "concurrently -k -n frontend,backend -c green,cyan \"pnpm --dir frontend dev --port 3000 --hostname 0.0.0.0\" \"cd backend && uv run uvicorn main:app --host 0.0.0.0 --port 8000 --reload\"",
+    "dev:full": "npm run dev",
     "dev:frontend": "pnpm --dir frontend dev --port 3000 --hostname 0.0.0.0",
     "dev:backend": "cd backend && uv run uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
   },

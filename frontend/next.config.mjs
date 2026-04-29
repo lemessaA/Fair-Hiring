@@ -1,4 +1,27 @@
+import os from "node:os"
+
 /** @type {import('next').NextConfig} */
+function lanIpv4Hosts() {
+  /** Non-loopback IPv4s so LAN access (e.g. http://10.x.x.x:3000) is allowed for Turbopack/HMR. */
+  const hosts = new Set()
+  for (const nets of Object.values(os.networkInterfaces())) {
+    for (const n of nets ?? []) {
+      if (n?.family === "IPv4" && !n.internal && n.address) hosts.add(n.address)
+    }
+  }
+  return [...hosts]
+}
+
+const fromEnv = (process.env.NEXT_ALLOWED_DEV_ORIGINS ?? "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean)
+
+const allowedDevOrigins =
+  process.env.NODE_ENV === "production"
+    ? fromEnv
+    : [...new Set([...fromEnv, ...lanIpv4Hosts(), "localhost", "127.0.0.1"])]
+
 const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
@@ -6,8 +29,12 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  ...(allowedDevOrigins.length > 0 ? { allowedDevOrigins } : {}),
   async rewrites() {
-    const backend = process.env.BACKEND_URL || "http://127.0.0.1:8000"
+    // Vercel Services: BACKEND_URL is injected for the backend service (e.g. https://…/_/backend).
+    // Strip trailing slash so destination is always backendRoot + / + path.
+    const raw = process.env.BACKEND_URL || "http://127.0.0.1:8000"
+    const backend = raw.replace(/\/$/, "")
     return [
       {
         source: "/api/:path*",

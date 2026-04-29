@@ -58,8 +58,9 @@
 }
 
 @theme inline {
-  --font-sans: 'Geist', 'Geist Fallback';
-  --font-mono: 'Geist Mono', 'Geist Mono Fallback';
+  /* next/font sets --font-geist-* on <html> when layout applies Geist.variable */
+  --font-sans: var(--font-geist-sans, ui-sans-serif), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono, ui-monospace), monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -115,7 +116,7 @@
     position: fixed;
     inset: 0;
     pointer-events: none;
-    z-index: 0;
+    z-index: -1;
     background-image:
       radial-gradient(1200px 600px at 12% -10%, color-mix(in oklab, var(--primary) 12%, transparent), transparent 60%),
       radial-gradient(900px 500px at 92% -5%, color-mix(in oklab, var(--chart-3) 8%, transparent), transparent 60%);
