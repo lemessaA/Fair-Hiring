@@ -13,8 +13,5 @@ dependencies = [
     "python-dotenv>=1.2.2",
     "sqlalchemy[asyncio]>=2.0.36",
     "asyncpg>=0.30.0",
-    "aiosqlite>=0.20.0",
-    "redis[hiredis]>=5.2.0",
-    "aiortc>=1.9.0",
     "httpx>=0.28.0",
 ]

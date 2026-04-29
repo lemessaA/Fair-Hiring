@@ -398,16 +398,11 @@ async def interview_webrtc_offer(
     body: WebRTCOfferRequest,
     db: AsyncSession = Depends(get_session_dep),
 ) -> WebRTCOfferResponse:
-    s = await orch.load_session(db, session_id)
-    if not s:
-        raise HTTPException(status_code=404, detail="Interview session not found.")
-    if body.type != "offer":
-        raise HTTPException(status_code=400, detail="Expected SDP type 'offer'.")
-    try:
-        ans = await wrtc.create_answer_for_offer(session_id, body.sdp, body.type)
-    except Exception as exc:
-        logger.exception("WebRTC offer failed")
-        raise HTTPException(status_code=500, detail=f"WebRTC negotiation failed: {exc}") from exc
-    await orch.log_audit(db, session_id, "webrtc_offer_exchanged", {})
-    await db.commit()
-    return WebRTCOfferResponse(sdp=ans["sdp"], type=str(ans["type"]))
+    """WebRTC is not available in the serverless deployment."""
+    raise HTTPException(
+        status_code=501,
+        detail=(
+            "WebRTC peer connections are not supported in the serverless deployment. "
+            "Use the audio-upload submission flow instead."
+        ),
+    )
