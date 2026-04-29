@@ -197,9 +197,9 @@ export function RankingTool() {
         <div className="mt-10 flex flex-col items-center gap-3 rounded-xl border border-primary/25 bg-primary/[0.06] p-6 text-center md:p-8">
           <p className="text-sm font-semibold tracking-tight text-foreground">Next: video interview</p>
           <p className="max-w-lg text-xs leading-relaxed text-muted-foreground md:text-sm">
-            Continue to a guided session with <strong>20 AI-generated questions</strong> tailored to this role. Your
-            answers are evaluated; at the end you receive an <strong>approve / reject</strong> hiring recommendation
-            from combined resume and interview scores.
+            Continue to a guided session with <strong>five AI-generated questions</strong> tailored to this role. On the
+            live tab, each answer is recorded for <strong>30 seconds</strong> and sent automatically. At the end you get
+            an <strong>approve / reject</strong> recommendation from combined resume and interview scores.
           </p>
           <Button asChild size="lg" className="gap-2 shadow-sm">
             <Link

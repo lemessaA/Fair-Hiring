@@ -30,8 +30,9 @@ export default function InterviewPage() {
             AI-guided interview
           </h1>
           <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            After resume ranking, open a session with <strong>20 AI-generated questions</strong>, answer by typing,
-            upload, or <strong>live camera + mic</strong>. Scoring uses transcribed speech only — then you see an{" "}
+            After resume ranking, open a session with <strong>five AI-generated questions</strong>. Use typing or
+            upload if you prefer, or the <strong>Live camera</strong> tab for <strong>30-second</strong> hands-free
+            answers that submit automatically. Scoring uses transcribed speech only — then you see an{" "}
             <strong>approve / reject</strong> recommendation for the role.
           </p>
         </div>
