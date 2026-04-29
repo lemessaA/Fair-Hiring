@@ -3,9 +3,7 @@ from __future__ import annotations
 import logging
 import os
 from collections.abc import AsyncIterator
-from pathlib import Path
 
-from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -21,14 +19,31 @@ _engine: AsyncEngine | None = None
 _session_factory: async_sessionmaker[AsyncSession] | None = None
 
 
-def _default_database_url() -> str:
-    backend_dir = Path(__file__).resolve().parent.parent
-    db_path = backend_dir / "interview.db"
-    return f"sqlite+aiosqlite:///{db_path}"
+def _to_asyncpg_url(url: str) -> str:
+    """Convert postgres:// or postgresql:// URL to postgresql+asyncpg:// for SQLAlchemy."""
+    if url.startswith("postgresql+asyncpg://"):
+        return url
+    if url.startswith("postgres://"):
+        return url.replace("postgres://", "postgresql+asyncpg://", 1)
+    if url.startswith("postgresql://"):
+        return url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    return url
 
 
 def get_database_url() -> str:
-    return os.environ.get("DATABASE_URL", _default_database_url())
+    # Prefer non-pooling URL (direct connection) for asyncpg compatibility,
+    # then fall back to pooling URL, then DATABASE_URL.
+    raw = (
+        os.environ.get("POSTGRES_URL_NON_POOLING")
+        or os.environ.get("POSTGRES_URL")
+        or os.environ.get("DATABASE_URL", "")
+    )
+    if not raw:
+        raise RuntimeError(
+            "No database URL configured. Set POSTGRES_URL_NON_POOLING, POSTGRES_URL, "
+            "or DATABASE_URL environment variable."
+        )
+    return _to_asyncpg_url(raw)
 
 
 def get_engine() -> AsyncEngine:
@@ -38,6 +53,8 @@ def get_engine() -> AsyncEngine:
         _engine = create_async_engine(
             url,
             echo=os.environ.get("SQLALCHEMY_ECHO", "").lower() in ("1", "true", "yes"),
+            pool_size=5,
+            max_overflow=10,
         )
     return _engine
 
@@ -53,36 +70,17 @@ def get_session_factory() -> async_sessionmaker[AsyncSession]:
     return _session_factory
 
 
-async def _ensure_sqlite_session_columns(conn) -> None:
-    """SQLite create_all does not add new columns; patch interview_session if needed."""
-    url = get_database_url()
-    if "sqlite" not in url.lower():
-        return
-    res = await conn.execute(text("PRAGMA table_info(interview_session)"))
-    rows = res.fetchall()
-    names = {r[1] for r in rows}
-    if "hire_decision" not in names:
-        await conn.execute(
-            text("ALTER TABLE interview_session ADD COLUMN hire_decision VARCHAR(16)")
-        )
-        logger.info("SQLite: added interview_session.hire_decision")
-    if "hire_rationale" not in names:
-        await conn.execute(text("ALTER TABLE interview_session ADD COLUMN hire_rationale TEXT"))
-        logger.info("SQLite: added interview_session.hire_rationale")
-
-
 async def init_db() -> None:
-    if os.environ.get("INTERVIEW_AUTO_CREATE_TABLES", "1").lower() not in (
-        "1",
-        "true",
-        "yes",
-    ):
-        return
+    """Verify Postgres connectivity on startup. Tables are managed via migration scripts."""
     engine = get_engine()
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-        await _ensure_sqlite_session_columns(conn)
-    logger.info("Interview ORM tables ensured (create_all).")
+    try:
+        from sqlalchemy import text
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+        logger.info("Interview database connection verified (PostgreSQL).")
+    except Exception as exc:
+        logger.error("Interview database connection failed: %s", exc)
+        raise
 
 
 async def dispose_db() -> None:
