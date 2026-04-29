@@ -31,8 +31,8 @@ const nextConfig = {
   },
   ...(allowedDevOrigins.length > 0 ? { allowedDevOrigins } : {}),
   async rewrites() {
-    // Vercel Services: BACKEND_URL is injected for the backend service (e.g. https://…/_/backend).
-    // Strip trailing slash so destination is always backendRoot + / + path.
+    // Client calls `/api/*` on the Next host; these rewrites proxy to FastAPI (local or FastAPI Cloud).
+    // On Vercel set BACKEND_URL to your API origin, e.g. https://your-app.fastapicloud.dev (no trailing slash).
     const raw = process.env.BACKEND_URL || "http://127.0.0.1:8000"
     const backend = raw.replace(/\/$/, "")
     return [

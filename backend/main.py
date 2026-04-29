@@ -46,10 +46,15 @@ app = fastapi.FastAPI(title="Fair Hiring Network API", lifespan=lifespan)
 
 app.include_router(interview_router)
 
+# Browser CORS only matters for direct calls to this API (not for Vercel rewrites,
+# which are server-to-server). Comma-separated origins; unset => "*". Do not use
+# allow_credentials=True with wildcard origins (invalid in browsers).
+_cors_raw = (os.environ.get("CORS_ALLOW_ORIGINS") or "").strip()
+_cors_origins = [o.strip() for o in _cors_raw.split(",") if o.strip()] if _cors_raw else ["*"]
 app.add_middleware(
     fastapi.middleware.cors.CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=_cors_origins,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
