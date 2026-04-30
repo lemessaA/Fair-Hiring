@@ -14,6 +14,14 @@ function pickAudioMimeType(): string | undefined {
   return undefined
 }
 
+/** `navigator.mediaDevices` is missing on insecure origins (non-HTTPS except localhost). */
+function getMediaDevices(): MediaDevices | null {
+  if (typeof navigator === "undefined") return null
+  const md = navigator.mediaDevices
+  if (!md || typeof md.getUserMedia !== "function") return null
+  return md
+}
+
 export type InterviewLiveCaptureProps = {
   /** Cleared on change / unmount — tear down camera when the interview session ends. */
   sessionKey: string
@@ -120,9 +128,18 @@ export function InterviewLiveCapture({
 
   const startCamera = useCallback(async () => {
     if (disabled) return
+    const mediaDevices = getMediaDevices()
+    if (!mediaDevices) {
+      const host =
+        typeof window !== "undefined" ? `${window.location.protocol}//${window.location.host}` : "this page"
+      onError(
+        `Camera and microphone are not available on ${host}. Browsers only expose them on HTTPS (or http://localhost / 127.0.0.1). Open the app over HTTPS, use localhost for dev, or try another browser.`,
+      )
+      return
+    }
     try {
       await stopCamera()
-      const stream = await navigator.mediaDevices.getUserMedia({
+      const stream = await mediaDevices.getUserMedia({
         video: {
           facingMode: "user",
           width: { ideal: 640 },
@@ -143,7 +160,7 @@ export function InterviewLiveCapture({
       setCameraOn(true)
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Could not access camera or microphone."
-      onError(`${msg} Check browser permissions (HTTPS or localhost required for getUserMedia).`)
+      onError(`${msg} If you already use HTTPS, check site permissions for camera and microphone.`)
     }
   }, [disabled, onError, stopCamera])
 
