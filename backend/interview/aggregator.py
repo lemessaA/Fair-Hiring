@@ -1,49 +1,65 @@
 from __future__ import annotations
 
-import os
 from typing import Any
 
 
-def _f(name: str, default: float) -> float:
-    v = os.environ.get(name)
-    if v is None or v.strip() == "":
-        return default
-    return float(v)
-
-
-def aggregate_scores(
+def aggregate_hire_scores(
     resume: float | None,
-    test: float | None,
-    interview: float | None,
+    live_interview: float | None,
+    typed_interview: float | None,
+    *,
+    test_score: float | None = None,
+    overall_interview: float | None = None,
 ) -> dict[str, Any]:
-    """Weighted combined score; missing components renormalized over available weights."""
-    wr = _f("AGGREGATOR_WEIGHT_RESUME", 0.4)
-    wt = _f("AGGREGATOR_WEIGHT_TEST", 0.3)
-    wi = _f("AGGREGATOR_WEIGHT_INTERVIEW", 0.3)
+    """
+    Hire **combined** score (0–100 scale inputs):
+
+    - **80%** live / camera path: average evaluation score for answers submitted **with audio**
+      (`audio_ref` set on the response).
+    - **10%** typed path: average for **transcript-only** answers (no audio upload).
+    - **10%** resume score from session input.
+
+    If only one interview mode exists, its nominal weight absorbs the other interview slot
+    (0.9 on that mode + 0.1 resume when both interview and resume exist; interview-only uses 1.0 on interview).
+    ``test_score`` is returned for display only and is **not** part of the hire blend.
+    """
+    has_l = live_interview is not None
+    has_t = typed_interview is not None
+    has_r = resume is not None
+
+    w_live = 0.8 if has_l else 0.0
+    w_typed = 0.1 if has_t else 0.0
+    w_resume = 0.1 if has_r else 0.0
+
+    if has_t and not has_l:
+        w_typed = 0.9
+    elif has_l and not has_t:
+        w_live = 0.9
 
     parts: list[tuple[float, float]] = []
-    if resume is not None:
-        parts.append((wr, resume))
-    if test is not None:
-        parts.append((wt, test))
-    if interview is not None:
-        parts.append((wi, interview))
+    if w_live > 0 and has_l:
+        parts.append((w_live, live_interview))
+    if w_typed > 0 and has_t:
+        parts.append((w_typed, typed_interview))
+    if w_resume > 0 and has_r:
+        parts.append((w_resume, resume))
 
-    if not parts:
-        return {
-            "resume": resume,
-            "test": test,
-            "interview": interview,
-            "combined": None,
-            "weights": {"resume": wr, "test": wt, "interview": wi},
-        }
+    combined: float | None = None
+    if parts:
+        wsum = sum(w for w, _ in parts)
+        if wsum > 0:
+            combined = round(sum(w * s for w, s in parts) / wsum, 2)
 
-    wsum = sum(p[0] for p in parts)
-    combined = sum(w * s for w, s in parts) / wsum if wsum else None
     return {
         "resume": resume,
-        "test": test,
-        "interview": interview,
-        "combined": round(float(combined), 2) if combined is not None else None,
-        "weights": {"resume": wr, "test": wt, "interview": wi},
+        "test": test_score,
+        "interview": overall_interview,
+        "interview_live": live_interview,
+        "interview_typed": typed_interview,
+        "combined": combined,
+        "weights": {
+            "hire_live": 0.8,
+            "hire_typed": 0.1,
+            "hire_resume": 0.1,
+        },
     }

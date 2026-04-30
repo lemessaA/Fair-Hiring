@@ -15,7 +15,7 @@ from interview import orchestrator as orch
 from interview import question_gen
 from interview import transcription as transcription_mod
 from interview import webrtc_signaling as wrtc
-from interview.aggregator import aggregate_scores
+from interview.aggregator import aggregate_hire_scores
 from interview.db import get_session_dep
 from interview.models import (
     CandidateResponse,
@@ -45,18 +45,31 @@ logger = logging.getLogger("fair-hiring.interview.routes")
 router = APIRouter(prefix="/interview", tags=["interview"])
 
 
+async def _hire_aggregation(db: AsyncSession, s: InterviewSession) -> dict[str, Any]:
+    live_avg, typed_avg = await orch.interview_live_and_typed_averages(db, s.id)
+    overall = await orch.interview_score_average(db, s.id)
+    return aggregate_hire_scores(
+        s.resume_score,
+        live_avg,
+        typed_avg,
+        test_score=s.test_score,
+        overall_interview=overall,
+    )
+
+
 async def _ensure_hire_decision(db: AsyncSession, s: InterviewSession) -> None:
     """Set hire_decision / hire_rationale once when interview is complete."""
     if s.hire_decision or s.status != "COMPLETED":
         return
-    avg = await orch.interview_score_average(db, s.id)
-    agg = aggregate_scores(s.resume_score, s.test_score, avg)
+    agg = await _hire_aggregation(db, s)
     combined = agg.get("combined")
     if isinstance(combined, (int, float)):
         combined_f: float | None = float(combined)
     else:
         combined_f = None
-    decision, rationale = hire_mod.decide_hire(combined_f, avg, s.resume_score)
+    overall = agg.get("interview")
+    overall_f = float(overall) if isinstance(overall, (int, float)) else None
+    decision, rationale = hire_mod.decide_hire(combined_f, overall_f, s.resume_score)
     s.hire_decision = decision
     s.hire_rationale = rationale
     await orch.log_audit(db, s.id, "hire_decided", {"decision": decision})
