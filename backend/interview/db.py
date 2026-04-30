@@ -40,17 +40,29 @@ def normalize_database_url(raw: str) -> str:
 
 
 def get_database_url() -> str:
-    # Prefer non-pooling URL (direct connection), then pooling URL, then DATABASE_URL
-    # (matches Vercel / Supabase-style env names).
-    raw = (
-        os.environ.get("POSTGRES_URL_NON_POOLING", "").strip()
-        or os.environ.get("POSTGRES_URL", "").strip()
-        or os.environ.get("DATABASE_URL", "").strip()
+    """Resolve Postgres URL from common platform env names (Vercel, Neon, Supabase, FastAPI Cloud)."""
+    keys = (
+        "POSTGRES_URL_NON_POOLING",
+        "POSTGRES_URL",
+        "DATABASE_URL",
+        "DATABASE_PRIVATE_URL",  # some hosts expose direct connection under this name
+        "NEON_DATABASE_URL",
+        "SUPABASE_DB_URL",
     )
+    raw = ""
+    for key in keys:
+        v = os.environ.get(key, "").strip()
+        if v:
+            raw = v
+            break
     if not raw:
         raise RuntimeError(
-            "No database URL configured. Set POSTGRES_URL_NON_POOLING, POSTGRES_URL, "
-            "or DATABASE_URL environment variable."
+            "No database URL configured. Set one of: "
+            + ", ".join(keys)
+            + ". "
+            "On FastAPI Cloud: Dashboard → your app → Environment variables → add DATABASE_URL "
+            "(your Supabase/Neon Postgres URI). `.env` is not shipped with the image unless you "
+            "inject it as secrets there."
         )
     return normalize_database_url(raw)
 
