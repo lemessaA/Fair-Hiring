@@ -6,7 +6,7 @@ import os
 import uuid
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from interview.models import (
@@ -84,20 +84,55 @@ async def prior_qa_summary(db: AsyncSession, session_id: str) -> list[dict[str, 
     return out
 
 
+def score_total_from_eval_json(scores_json: dict[str, Any] | None) -> int:
+    """Map one evaluation row to a 0–100 style total (matches prior interview average logic)."""
+    scores = scores_json or {}
+    wt = scores.get("weighted_total")
+    if isinstance(wt, (int, float)):
+        return int(wt)
+    cq = int(scores.get("content_quality", 0))
+    r = int(scores.get("reasoning", 0))
+    cc = int(scores.get("communication_clarity", 0))
+    return int(round((cq + r + cc) / 3))
+
+
 async def interview_score_average(db: AsyncSession, session_id: str) -> float | None:
     stmt = select(EvaluationResult).where(EvaluationResult.session_id == session_id)
     evs = list((await db.execute(stmt)).scalars().all())
     if not evs:
         return None
-    totals: list[int] = []
-    for e in evs:
-        scores = e.scores_json or {}
-        wt = scores.get("weighted_total")
-        if isinstance(wt, (int, float)):
-            totals.append(int(wt))
-        else:
-            cq = int(scores.get("content_quality", 0))
-            r = int(scores.get("reasoning", 0))
-            cc = int(scores.get("communication_clarity", 0))
-            totals.append(int(round((cq + r + cc) / 3)))
+    totals = [score_total_from_eval_json(e.scores_json) for e in evs]
     return round(sum(totals) / len(totals), 2)
+
+
+async def interview_live_and_typed_averages(
+    db: AsyncSession, session_id: str
+) -> tuple[float | None, float | None]:
+    """
+    Split interview score by submission mode (same rubric, different inputs):
+    - **Live** (80% target weight): answers submitted with an **audio** file (`audio_ref` set).
+    - **Typed** (10% target weight): answers submitted as **transcript text only** (no `audio_ref`).
+    """
+    stmt = (
+        select(EvaluationResult.scores_json, CandidateResponse.audio_ref)
+        .join(
+            CandidateResponse,
+            and_(
+                CandidateResponse.session_id == EvaluationResult.session_id,
+                CandidateResponse.question_id == EvaluationResult.question_id,
+            ),
+        )
+        .where(EvaluationResult.session_id == session_id)
+    )
+    rows = list((await db.execute(stmt)).all())
+    live_totals: list[int] = []
+    typed_totals: list[int] = []
+    for scores_json, audio_ref in rows:
+        v = score_total_from_eval_json(scores_json)
+        if audio_ref:
+            live_totals.append(v)
+        else:
+            typed_totals.append(v)
+    live_avg = round(sum(live_totals) / len(live_totals), 2) if live_totals else None
+    typed_avg = round(sum(typed_totals) / len(typed_totals), 2) if typed_totals else None
+    return live_avg, typed_avg
